@@ -7,8 +7,8 @@ from openai import OpenAI
 st.set_page_config(page_title="AI 테니스 코치", page_icon="🎾")
 
 # 2. 제목
-st.title("🎾 AI 테니스 코치")
-st.write("당신의 테니스 영상을 AI가 분석해 드립니다!")
+st.title("🎾 AI 테니스 코치 통합버전")
+st.write("기초 레슨부터 내 스윙 분석까지 한 번에!")
 
 # 3. API 키 설정 (Streamlit Secrets에서 가져오기)
 if "OPENAI_API_KEY" in st.secrets:
@@ -16,53 +16,64 @@ if "OPENAI_API_KEY" in st.secrets:
 else:
     api_key = st.text_input("OpenAI API Key를 입력하세요", type="password")
 
-# 4. 탭 생성 (여기가 중요! 탭이 2개 만들어집니다)
-tab1, tab2 = st.tabs(["홈", "🎥 스윙 영상 분석"])
+# 4. 탭 생성 (사라졌던 탭들을 다시 복구했습니다!)
+tab1, tab2, tab3, tab4 = st.tabs(["홈", "기초 자세", "그립 가이드", "🎥 스윙 영상 분석"])
 
 # --- 탭 1: 홈 화면 ---
 with tab1:
     st.header("환영합니다!")
-    st.write("위의 '스윙 영상 분석' 탭을 눌러서 영상을 올려보세요.")
-    st.info("아이폰이나 갤럭시로 찍은 서브/스트로크 영상을 올리면 AI가 조언을 해줍니다.")
+    st.write("테니스 실력을 향상시키기 위한 모든 도구가 여기에 있습니다.")
+    st.info("오른쪽 끝에 있는 '🎥 스윙 영상 분석' 탭을 눌러보세요!")
 
-# --- 탭 2: 영상 분석 기능 ---
+# --- 탭 2: 기초 자세 (복구됨) ---
 with tab2:
-    st.header("스윙 영상 업로드")
+    st.header("테니스 기초 자세")
+    st.write("1. **준비 자세 (Ready Position):** 무릎을 약간 굽히고 라켓을 정면으로 듭니다.")
+    st.write("2. **스플릿 스텝:** 상대가 공을 치는 순간 가볍게 점프합니다.")
+    st.write("3. **테이크백:** 공이 오는 방향을 확인하고 미리 라켓을 뒤로 뺍니다.")
+    # 필요하다면 여기에 유튜브 영상 링크나 이미지를 넣을 수 있습니다.
+
+# --- 탭 3: 그립 가이드 (복구됨) ---
+with tab3:
+    st.header("그립 잡는 법")
+    st.write("- **컨티넨탈 그립:** 서브와 발리에 적합합니다. (망치 잡듯이)")
+    st.write("- **이스턴 그립:** 플랫 포핸드에 유리합니다.")
+    st.write("- **세미 웨스턴 그립:** 현대 테니스에서 가장 많이 쓰는 스핀용 그립입니다.")
+
+# --- 탭 4: 영상 분석 기능 (새 기능) ---
+with tab4:
+    st.header("스윙 영상 업로드 & AI 코칭")
+    st.warning("⚠️ 모바일 데이터 주의: 영상은 10초 이내로 짧게 찍어서 올려주세요.")
     
-    # 파일 업로더 (mp4, mov 지원)
-    uploaded_file = st.file_uploader("영상을 선택하세요", type=['mp4', 'mov', 'avi'])
+    # 파일 업로더
+    uploaded_file = st.file_uploader("촬영한 영상을 업로드하세요", type=['mp4', 'mov', 'avi'])
 
     if uploaded_file is not None:
         # 영상 미리보기
         st.video(uploaded_file)
         
-        analyze_button = st.button("AI 분석 시작하기")
+        analyze_button = st.button("AI 코치에게 분석 요청")
         
         if analyze_button and api_key:
             client = OpenAI(api_key=api_key)
             
-            with st.spinner("AI가 영상을 보고 있습니다... 잠시만 기다려주세요 (약 30초)"):
+            with st.spinner("AI가 스윙을 분석 중입니다..."):
                 try:
-                    # 1. 임시 파일로 저장
-                    tfile = tempfile.NamedTemporaryFile(delete=False) 
-                    tfile.write(uploaded_file.read())
-                    
-                    # 2. 텍스트로 시뮬레이션 (실제 비전 기능 연동 전 단계)
-                    # 실제 비전 API는 복잡하므로, 우선 연결 확인을 위해 텍스트로 응답을 받습니다.
+                    # 실제 영상 분석 대신 텍스트 시뮬레이션 (비전 API 연결 전 테스트)
                     response = client.chat.completions.create(
-                        model="gpt-4o",  # GPT-4o 모델 사용
+                        model="gpt-4o",
                         messages=[
-                            {"role": "system", "content": "당신은 세계적인 테니스 코치입니다. 사용자가 영상을 올렸다고 가정하고, 테니스 서브를 잘하는 일반적인 팁 3가지를 알려주세요."},
-                            {"role": "user", "content": "내 서브 자세 좀 봐줘. 피드백 부탁해!"}
+                            {"role": "system", "content": "당신은 20년 경력의 테니스 코치입니다. 초보자의 영상을 봤다고 가정하고, 서브 동작에서 가장 흔히 하는 실수와 교정법을 친절하게 알려주세요."},
+                            {"role": "user", "content": "방금 내 서브 영상이야. 피드백 좀 줘."}
                         ]
                     )
                     
-                    # 3. 결과 출력
                     result = response.choices[0].message.content
-                    st.success("분석 완료!")
+                    st.success("분석이 완료되었습니다!")
+                    st.markdown("### 📝 AI 코치의 피드백")
                     st.markdown(result)
                     
                 except Exception as e:
-                    st.error(f"에러가 발생했습니다: {e}")
+                    st.error(f"오류가 발생했습니다: {e}")
         elif analyze_button and not api_key:
-            st.warning("API 키가 필요합니다!")
+            st.warning("API 키가 설정되지 않았습니다.")
