@@ -1,4 +1,129 @@
-streamlit
-google-generativeai
-python-dotenv
-Pillow
+import streamlit as st
+import google.generativeai as genai
+from PIL import Image
+import time
+import os
+
+# --- 페이지 설정 ---
+st.set_page_config(
+    page_title="Grand Slam AI Coach",
+    page_icon="🏆",
+    layout="wide"
+)
+
+# --- 헤더 ---
+st.markdown("""
+    <div style='text-align:center; padding-bottom: 20px;'>
+        <h1 style='color:#1E88E5;'>🏆 Grand Slam AI Coach (Video Edition)</h1>
+        <p style='font-size:1.2rem;'>사진은 물론 동영상 스윙 분석까지</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# --- 사이드바: 설정 ---
+with st.sidebar:
+    st.header("⚙️ 설정")
+    if "GOOGLE_API_KEY" in st.secrets:
+        api_key = st.secrets["GOOGLE_API_KEY"]
+        st.success("✅ 정품 라이센스 인증됨")
+    else:
+        api_key = st.text_input("API Key 입력", type="password")
+
+    if not api_key:
+        st.warning("⚠️ API 키가 필요합니다.")
+        st.stop()
+
+    genai.configure(api_key=api_key)
+
+    st.markdown("---")
+    st.subheader("👤 내 정보")
+    player_level = st.selectbox("내 레벨", ["입문 (테린이)", "초급 (2.5-3.0)", "중급 (3.5-4.0)", "상급 (4.5+)", "선수급"], index=2)
+    play_style = st.selectbox("내 스타일", ["올라운더", "공격형 베이스라이너", "수비형 베이스라이너", "서브 앤 발리"], index=0)
+
+# --- AI 모델 설정 (Gemini 1.5 Pro 사용) ---
+# 1.5 Pro는 비디오, 긴 텍스트, 이미지를 모두 처리하는 멀티모달 최강 모델입니다.
+try:
+    model = genai.GenerativeModel('gemini-1.5-pro')
+except Exception as e:
+    st.error(f"모델 로딩 실패: {e}")
+
+# --- AI 페르소나 ---
+grand_slam_prompt = f"""
+당신은 'Grand Slam AI'입니다. 세계 최고의 테니스 코치입니다.
+사용자 레벨: {player_level}, 스타일: {play_style}.
+
+**분석 원칙:**
+1. 동영상이 주어지면 [준비 자세 - 임팩트 - 팔로우스루] 단계별로 정밀 분석하세요.
+2. 부상 위험(손목, 어깨, 무릎)을 체크하세요.
+3. 교정해야 할 구체적인 연습법(Drill)을 1~2개 추천하세요.
+4. 말투는 격려하면서도 전문적인 코치처럼 하세요.
+"""
+
+def process_video(uploaded_file):
+    """동영상을 임시 저장하고 AI에게 업로드하는 함수"""
+    # 1. 임시 파일로 저장
+    with open("temp_video.mp4", "wb") as f:
+        f.write(uploaded_file.read())
+    
+    # 2. Google AI 서버로 업로드
+    video_file = genai.upload_file(path="temp_video.mp4")
+    
+    # 3. 처리 완료 대기 (동영상은 처리에 시간이 조금 걸림)
+    while video_file.state.name == "PROCESSING":
+        time.sleep(2)
+        video_file = genai.get_file(video_file.name)
+        
+    return video_file
+
+def generate_response(prompt, content=None, is_video=False):
+    full_prompt = [grand_slam_prompt, prompt]
+    
+    with st.spinner("코치가 영상을 프레임 단위로 분석 중입니다... (10~20초 소요) 🎾"):
+        try:
+            if content:
+                # 동영상이나 이미지가 있으면 프롬프트와 함께 전달
+                response = model.generate_content(full_prompt + [content])
+            else:
+                response = model.generate_content(full_prompt)
+            return response.text
+        except Exception as e:
+            return f"오류가 발생했습니다: {e}"
+
+# --- 메인 탭 ---
+tab1, tab2, tab3 = st.tabs(["🎥 스윙 영상 분석", "📸 사진 분석", "🧠 전략 & 멘탈"])
+
+with tab1:
+    st.header("비디오 코칭 (Beta)")
+    st.info("💡 팁: 10초 이내의 짧은 스윙 영상(서브, 포핸드 등)을 올리면 가장 정확합니다.")
+    
+    video_upload = st.file_uploader("동영상 업로드 (mp4, mov 등)", type=['mp4', 'mov', 'avi'])
+    
+    if video_upload:
+        st.video(video_upload) # 업로드한 영상 미리보기
+        
+        if st.button("영상 정밀 분석 시작 🚀"):
+            # 비디오 처리
+            processed_video = process_video(video_upload)
+            # AI 분석 요청
+            result = generate_response("이 테니스 스윙 영상을 분석하고 개선점을 알려줘.", processed_video, is_video=True)
+            st.markdown("---")
+            st.markdown(result)
+            
+            # (선택) 임시 파일 삭제
+            if os.path.exists("temp_video.mp4"):
+                os.remove("temp_video.mp4")
+
+with tab2:
+    st.header("자세 사진 분석")
+    img_upload = st.file_uploader("사진 업로드", type=["jpg", "png", "jpeg"])
+    if img_upload:
+        image = Image.open(img_upload)
+        st.image(image, use_column_width=True)
+        if st.button("사진 분석 시작"):
+            result = generate_response("이 자세를 분석해줘.", image)
+            st.markdown(result)
+
+with tab3:
+    st.header("멘탈 & 전략")
+    query = st.text_input("질문 (예: 브레이크 포인트 때 너무 떨려)")
+    if st.button("조언 구하기"):
+        st.markdown(generate_response(query))
